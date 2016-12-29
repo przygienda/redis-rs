@@ -335,7 +335,6 @@ pub use commands::{
     PipelineCommands,
 };
 
-#[doc(hidden)]
 pub use types::{
     /* low level values */
     Value,
