@@ -632,6 +632,15 @@ fn test_nice_list_api() {
     assert_eq!(con.llen("my_list"), Ok(7));
 
     assert_eq!(con.lrange("my_list", 0, 2), Ok((2, 3, 4)));
+
+    let v : Vec<i32> = vec![255,254];
+    assert_eq!(con.rpush("my_list2", v), Ok(2));
+    assert_eq!(con.lrange("my_list2", 0, 2), Ok(vec![255,254]));
+
+    // check whether that writes out nicely
+    let v : Vec<u8> = vec![255,254];
+    assert_eq!(con.rpush("my_list3", (&v).to_redis_args()), Ok(1));
+    assert_eq!(con.lrange("my_list3", 0, 2), Ok(vec![255 as u8,254]));
 }
 
 #[test]
