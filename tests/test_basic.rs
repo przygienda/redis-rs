@@ -621,6 +621,8 @@ fn test_nice_hash_api() {
 
 #[test]
 fn test_nice_list_api() {
+	use redis::ToRedisArgs;
+
     let ctx = TestContext::new();
     let con = ctx.connection();
 
@@ -639,8 +641,11 @@ fn test_nice_list_api() {
 
     // check whether that writes out nicely
     let v : Vec<u8> = vec![255,254];
-    assert_eq!(con.rpush("my_list3", (&v).to_redis_args()), Ok(1));
+    assert_eq!(con.rpush("my_list3", v.clone()), Ok(1));
     assert_eq!(con.lrange("my_list3", 0, 2), Ok(vec![255 as u8,254]));
+
+    assert_eq!(con.rpush("my_list4", (&v).to_redis_args()), Ok(1));
+    assert_eq!(con.lrange("my_list4", 0, 2), Ok(vec![255 as u8,254]));
 }
 
 #[test]
