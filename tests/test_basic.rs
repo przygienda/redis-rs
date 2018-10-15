@@ -116,6 +116,7 @@ impl TestContext {
                 addr: Box::new(server.get_client_addr().clone()),
                 db: 0,
                 passwd: None,
+            timeout: 5,
             })
             .unwrap();
         let con;

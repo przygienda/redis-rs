@@ -5,6 +5,7 @@ use std::str::from_utf8;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::time::Duration;
+use std::net::{IpAddr, ToSocketAddrs, SocketAddr, Shutdown};
 
 use url;
 
@@ -75,6 +76,8 @@ pub struct ConnectionInfo {
     pub db: i64,
     /// Optionally a password that should be used for connection.
     pub passwd: Option<String>,
+    /// connection timeout
+    pub timeout: u16,
 }
 
 /// Converts an object into a connection info struct.  This allows the
@@ -102,12 +105,12 @@ impl<'a> IntoConnectionInfo for &'a str {
 fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
     Ok(ConnectionInfo {
         addr: Box::new(ConnectionAddr::Tcp(match url.host() {
-                                               Some(host) => host.to_string(),
-                                               None => {
-                                                   fail!((ErrorKind::InvalidClientConfig,
+            Some(host) => host.to_string(),
+            None => {
+                fail!((ErrorKind::InvalidClientConfig,
                                                           "Missing hostname"))
-                                               }
-                                           },
+            }
+        },
                                            url.port().unwrap_or(DEFAULT_PORT))),
         db: match url.path().trim_matches('/') {
             "" => 0,
@@ -117,6 +120,13 @@ fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
             }
         },
         passwd: url.password().and_then(|pw| Some(pw.to_string())),
+        timeout: match url.query_pairs().into_iter().filter(|&(ref key, _)| key == "ConnectTimeout").next() {
+            Some((_, to)) => {
+                unwrap_or!(to.parse::< u16 >().ok(),
+    fail! ((ErrorKind::InvalidClientConfig, "Invalid timeout")))
+            }
+            None => 60,
+        },
     })
 }
 
@@ -134,6 +144,7 @@ fn url_to_unix_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
             None => 0,
         },
         passwd: url.password().and_then(|pw| Some(pw.to_string())),
+        timeout: 60,
     })
 }
 
@@ -182,11 +193,14 @@ pub struct Msg {
 }
 
 impl ActualConnection {
-    pub fn new(addr: &ConnectionAddr) -> RedisResult<ActualConnection> {
+    pub fn new(addr: &ConnectionAddr, timeout: u16) -> RedisResult<ActualConnection> {
         Ok(match *addr {
             ConnectionAddr::Tcp(ref host, ref port) => {
                 let host: &str = &*host;
-                let tcp = try!(TcpStream::connect((host, *port)));
+                let ha : IpAddr = host.parse().unwrap();
+                let sa = SocketAddr::from((ha, *port));
+                let tcp = try!(TcpStream::connect_timeout(&sa,
+                                                          Duration::from_secs(timeout as _)));
                 let buffered = BufReader::new(tcp);
                 ActualConnection::Tcp(buffered)
             }
@@ -267,7 +281,7 @@ impl ActualConnection {
 
 
 pub fn connect(connection_info: &ConnectionInfo) -> RedisResult<Connection> {
-    let con = try!(ActualConnection::new(&connection_info.addr));
+    let con = try!(ActualConnection::new(&connection_info.addr, connection_info.timeout));
     let rv = Connection {
         con: RefCell::new(con),
         db: connection_info.db,
