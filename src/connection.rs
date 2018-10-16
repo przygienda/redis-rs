@@ -125,7 +125,7 @@ fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
                 unwrap_or!(to.parse::< u16 >().ok(),
     fail! ((ErrorKind::InvalidClientConfig, "Invalid timeout")))
             }
-            None => 60,
+            None => 5,
         },
     })
 }
@@ -144,7 +144,7 @@ fn url_to_unix_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
             None => 0,
         },
         passwd: url.password().and_then(|pw| Some(pw.to_string())),
-        timeout: 60,
+        timeout: 5,
     })
 }
 
