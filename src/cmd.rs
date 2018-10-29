@@ -425,7 +425,8 @@ impl Pipeline {
     fn make_pipeline_results(&self, resp: Vec<Value>) -> Value {
         let mut rv = vec![];
         for (idx, result) in resp.into_iter().enumerate() {
-            if !self.commands[idx].is_ignored {
+            // on pathological redis server errors we end up blowing the index
+            if idx < self.commands.len() && !self.commands[idx].is_ignored {
                 rv.push(result);
             }
         }
